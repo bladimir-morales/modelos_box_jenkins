@@ -1,0 +1,185 @@
+---
+title: "Modelos de Box y Jenkins"
+subtitle: "Trabajo 2. Análisis de Series de Tiempo"
+author: "Bladimir Valerio Morales Torrez"
+date: "Enero 2022"
+output: 
+  html_document:
+      toc: yes
+      toc_float: yes
+      number_section: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(tidyverse)
+library(dygraphs)
+library(fpp)
+library(forecast)
+```
+
+\newpage
+
+# Introducción
+
+Para este trabajo de análisis de series de tiempo se aplicarán técnicas de modelamiento en series temporales, específicamente los modelos de Box y Jenkins.
+
+La serie de tiempo de estudio para este trabajo es:
+
+* Indice de consumo de agua potable ICAP (enero 1990 a julio 2021).
+
+Se puede encontrar el repositorio de datos y del informe en el siguiente enlace (https://github.com/bladimir-morales/series_de_tiempo).
+
+Se puede visualizar el presente informe en formato pdf, en el siguiente enlace:
+
+- https://bladimir-morales.github.io/series_de_tiempo/trabajo1.pdf
+
+Se puede visualizar el presente informe en formato html, en el siguiente enlace:
+
+- https://bladimir-morales.github.io/series_de_tiempo/trabajo1.html
+
+
+# Indice de consumo de agua potable ICAP
+
+## Descripción 
+
+### Datos
+
+El indice mensual de consumo de agua potable de Bolivia ICAP, es un indicador que nos permite conocer *la evolución y comportamiento* del consumo de agua potable de los sectores privado y público a nivel general con año base de 1990, así para este año el indice será igual a 100 y para las siguientes gestiones presentará una variación (incremento o decremento) respecto al año base de acuerdo al consumo de agua potable del mes a tratarse. 
+
+### Periodo de estudio
+
+La serie de tiempo esta con periodicidad mensual, comprendidos desde enero de 1990 hasta julio de 2021, teniendo en total 379 observaciones.
+
+### Fuente de datos
+
+La información del indice mensual de consumo de agua potable de Bolivia se puede encontrar en la página oficial del Instituto Nacional de Estadística (INE)^[www.ine.gob.bo], sección de "Estadísticas Económicas" y subsección "Servicios básicos". Específicamente se puede descargar los datos en formato establecido por la institución en excel del siguiente enlace: (https://nube.ine.gob.bo/index.php/s/M1H9axannIL7leg/download).
+
+Los metadatos están disponibles en el Catálogo del Archivo Nacional de Datos (ANDA) del INE (http://anda4.ine.gob.bo/ANDA4_2/index.php/catalog/254).
+
+Para fines prácticos se puso la variable en estudio en formato *.txt, el cual puede ser descargada del siguiente enlace (https://raw.githubusercontent.com/bladimir-morales/series_de_tiempo/main/data/agua.txt).
+
+## Gráfico
+
+```{r}
+url<-"https://raw.githubusercontent.com/bladimir-morales/series_de_tiempo/main/data/agua.txt"
+agua<-read.table(url,head=T)
+agua_serie<-ts(agua$agua,start = c(1990,1),frequency = 12)
+
+forecast::autoplot(agua_serie,series = "ICAP")+
+  ggtitle("Indice mensual de consumo de agua potable en Bolivia: enero 1990 a julio 2021 \n 
+          (año base 1990=100)")+
+  xlab("Año")+ylab("ICAP")+
+  theme(legend.position = "none")+
+  scale_color_manual(values="#2B7DFF")
+```
+
+En el gráfico visualmente se puede observar que la serie de tiempo en estudio tendría tendencia aditiva y efecto estacional. 
+
+### Tendencia
+
+Para obtener la tendencia de la serie de tiempo, se aplicará una media móvil de orden 12 ya que las observaciones son mensuales.
+
+```{r}
+ma_agua_serie<-ma(agua_serie,order = 12)
+
+autoplot(agua_serie,series = "ICAP")+
+  autolayer(ma_agua_serie,series="Tendencia")+
+  ggtitle("Tendencia del Indice mensual de consumo de agua potable en Bolivia")+
+  xlab("Año")+ylab("ICAP")+
+  scale_color_manual(values=c("#A4C4FC","#E80808"))
+```
+
+Con la media móvil de orden 12 se puede observar en el gráfico la tendencia aditiva de la serie de tiempo, cabe mencionar que en diciembre del 2016 a aproximadamente junio del 2017 hay una rampa decreciente que puede explicarse por un fenómeno climático de sequía y falta de lluvias en Bolivia, lo cual derivó a un desabastecimiento de agua en ocho de los nueve departamentos del país y en 94 barrios del departamento de La Paz existió un racionamiento de agua, esto se detalla de mejor manera el reportaje de CNN en español en su portal web^[https://cnnespanol.cnn.com/2016/11/21/declaran-emergencia-nacional-en-bolivia-por-sequia-y-falta-de-agua/].
+
+### Estacionalidad
+
+```{r}
+ggseasonplot(agua_serie,main="Estacionalidad del Indice Mensual de Consumo de Agua Potable",
+           year.labels = T,xlab="Mes",ylab="ICAP")
+```
+
+En este gráfico se puede observar que existe una tendencia creciente, ya que a medida que pasa cada año el consumo de agua potable va aumentando, por otro lado no se presente de manera clara el efecto estacional.
+
+```{r}
+monthplot(agua_serie,ylab="",main="Estacionalidad del Indice Mensual de Consumo de Agua Potable",
+          labels = c("Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"),
+          xlab="Mes")
+```
+
+En este último gráfico se puede observar que podría existir un efecto estacional ya que en los meses de enero y noviembre asciende de manera muy leve el consumo de agua potable en Bolivia, pero en los demás meses se mantiene casi constantemente.
+
+**Conclusión:**  
+Se puede concluir entonces con un análisis visual que la serie en estudio del indice de consumo de agua potable en Bolivia tiene efecto de tendencia aditiva con una posible estacionalidad.
+
+## Datos de entrenamiento y test
+
+Para efectos de obtener un modelo óptimo y lo más preciso posible, se dividirá la serie de tiempo en dos conjuntos:
+
+* Conjunto de datos de entrenamiento: 
+
+Se tomará en cuenta los datos desde enero de 1990 hasta diciembre de 2019, contando con 360 observaciones.
+
+* Conjunto de datos de test.
+
+Se tomará en cuenta los datos desde enero de 2020 hasta julio de 2021, contando con 19 observaciones.
+
+En el siguiente gráfico se puede observar la serie de entrenamiento y de test.
+
+```{r}
+agua_serie_ent<-ts(agua$agua,start = c(1990,1),end = c(2019,12), frequency=12)
+agua_serie_test<-ts(agua$agua[361:379],start = c(2020,1), frequency=12)
+
+autoplot(agua_serie_ent,series = "ICAP \nentrenamiento")+
+  autolayer(agua_serie_test,series="ICAP \ntest")+
+  ggtitle("Conjunto de entrenamiento y test del ICAP")+
+  xlab("Año")+ylab("ICAP")+
+  scale_color_manual(values=c("#469F4B","#A462EF"))
+```
+
+
+
+# Ajuste del Modelo de Box y Jenkins
+
+Se aplicará el modelo de Box y Jenkins
+
+## Estacionariedad
+
+### Función de autocorrelación 
+
+```{r}
+acf(agua_serie_ent)
+```
+
+### Test de estacionariedad de Box-Pierce
+
+```{r}
+Box.test(agua_serie_ent,type="Box-Pierce")
+```
+
+
+### Test de estacionariedad de Ljung-Box
+
+```{r}
+Box.test(agua_serie_ent,type="Ljung-Box")
+```
+
+
+
+```{r}
+dif_agua_serie_ent<-diff(agua_serie_ent,lag=1)
+autoplot(dif_agua_serie_ent)
+
+log_dif_agua_serie_ent<-log(dif_agua_serie_ent)
+
+autoplot(log_dif_agua_serie_ent)
+autoplot(agua_serie_ent)
+
+
+modelo<-arima(agua_serie_ent)
+```
+
+
