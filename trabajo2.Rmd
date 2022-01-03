@@ -14,11 +14,12 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(readxl)
+#library(readxl)
 library(tidyverse)
-library(dygraphs)
-library(fpp)
+#library(dygraphs)
+#library(fpp)
 library(forecast)
+library(tseries)
 ```
 
 \newpage
@@ -148,6 +149,8 @@ Se aplicará el modelo de Box y Jenkins
 
 ## Estacionariedad
 
+Para poder determinar de manenra teórica si la serie del ICAP es estacionaria se hará un análisis gráfico de la función de autocorrelación, 
+
 ### Función de autocorrelación 
 
 ```{r}
@@ -170,13 +173,27 @@ Box.test(agua_serie_ent,type="Ljung-Box")
 
 
 ```{r}
+adf.test(agua_serie_ent)
+
+log_agua_serie_ent<-log(agua_serie_ent)
+dif_log_agua_serie_ent<-diff(log_agua_serie_ent,lag=1)
+autoplot(dif_log_agua_serie_ent)
+adf.test(dif_log_agua_serie_ent)
+
+log_agua_serie_ent<-log(agua_serie_ent)
+dif_log_agua_serie_ent<-diff(log_agua_serie_ent,lag=1)
+dif2_log_agua_serie_ent<-diff(dif_log_agua_serie_ent,lag=12)
+autoplot(dif2_log_agua_serie_ent)
+adf.test(dif2_log_agua_serie_ent)
+
+
 dif_agua_serie_ent<-diff(agua_serie_ent,lag=1)
-autoplot(dif_agua_serie_ent)
+dif2_agua_serie_ent<-diff(dif_agua_serie_ent,lag=12)
+autoplot(dif2_agua_serie_ent)
+adf.test(dif2_agua_serie_ent)
 
-log_dif_agua_serie_ent<-log(dif_agua_serie_ent)
 
-autoplot(log_dif_agua_serie_ent)
-autoplot(agua_serie_ent)
+
 
 
 modelo<-arima(agua_serie_ent)
