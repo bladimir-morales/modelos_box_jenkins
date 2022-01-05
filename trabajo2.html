@@ -256,14 +256,14 @@ div.tocify {
 <ul>
 <li>Indice de consumo de agua potable ICAP (enero 1990 a julio 2021).</li>
 </ul>
-<p>Se puede encontrar el repositorio de datos y del informe en el siguiente enlace (<a href="https://github.com/bladimir-morales/series_de_tiempo" class="uri">https://github.com/bladimir-morales/series_de_tiempo</a>).</p>
+<p>Se puede encontrar el repositorio de datos y del informe en el siguiente enlace (<a href="https://github.com/bladimir-morales/modelos_box_jenkins" class="uri">https://github.com/bladimir-morales/modelos_box_jenkins</a>).</p>
 <p>Se puede visualizar el presente informe en formato pdf, en el siguiente enlace:</p>
 <ul>
-<li><a href="https://bladimir-morales.github.io/series_de_tiempo/trabajo1.pdf" class="uri">https://bladimir-morales.github.io/series_de_tiempo/trabajo1.pdf</a></li>
+<li><a href="https://bladimir-morales.github.io/modelos_box_jenkins/trabajo2.pdf" class="uri">https://bladimir-morales.github.io/modelos_box_jenkins/trabajo2.pdf</a></li>
 </ul>
 <p>Se puede visualizar el presente informe en formato html, en el siguiente enlace:</p>
 <ul>
-<li><a href="https://bladimir-morales.github.io/series_de_tiempo/trabajo1.html" class="uri">https://bladimir-morales.github.io/series_de_tiempo/trabajo1.html</a></li>
+<li><a href="https://bladimir-morales.github.io/modelos_box_jenkins/trabajo2.html" class="uri">https://bladimir-morales.github.io/modelos_box_jenkins/trabajo2.html</a></li>
 </ul>
 </div>
 <div id="indice-de-consumo-de-agua-potable-icap" class="section level1" number="2">
@@ -285,7 +285,8 @@ div.tocify {
 </div>
 <div id="gráfico" class="section level1" number="3">
 <h1 number="3"><span class="header-section-number">3</span> Gráfico</h1>
-<pre class="r"><code>url&lt;-&quot;https://raw.githubusercontent.com/bladimir-morales/series_de_tiempo/main/data/agua.txt&quot;
+<pre class="r"><code>#url&lt;-&quot;https://raw.githubusercontent.com/bladimir-morales/modelos_box_jenkins/main/agua.txt&quot;
+url&lt;-&quot;https://raw.githubusercontent.com/bladimir-morales/series_de_tiempo/main/data/agua.txt&quot;
 agua&lt;-read.table(url,head=T)
 serie&lt;-ts(agua$agua,start = c(1990,1),frequency = 12)
 
@@ -773,7 +774,7 @@ hist(residuos[-atipico])</code></pre>
 ##  Jarque-Bera test for normality
 ## 
 ## data:  residuos[-atipico]
-## JB = 4.8267, p-value = 0.072</code></pre>
+## JB = 4.8267, p-value = 0.0635</code></pre>
 <p>Sin contar con este dato se puede observar que no se rechaza la hipótesis nula, teniendo así normalidad en los residuos.</p>
 <ul>
 <li><strong>Dócima de Shapiro-Wilk</strong></li>
@@ -810,7 +811,7 @@ hist(residuos[-atipico])</code></pre>
 ##  White Neural Network Test
 ## 
 ## data:  residuos
-## X-squared = 2.1104, df = 2, p-value = 0.3481</code></pre>
+## X-squared = 2.1491, df = 2, p-value = 0.3414</code></pre>
 <p>Se concluye que no se rechaza la hipótesis nula, teniendo así evidencia estadística para decir que los residuos son homocedásticos.</p>
 <p><strong>Dócima de Breush-Pagan</strong></p>
 <p>La hipótesis a contrastar es:</p>

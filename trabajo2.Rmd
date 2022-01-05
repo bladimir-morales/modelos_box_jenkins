@@ -31,15 +31,15 @@ La serie de tiempo de estudio para este trabajo es:
 
 * Indice de consumo de agua potable ICAP (enero 1990 a julio 2021).
 
-Se puede encontrar el repositorio de datos y del informe en el siguiente enlace (https://github.com/bladimir-morales/series_de_tiempo).
+Se puede encontrar el repositorio de datos y del informe en el siguiente enlace (https://github.com/bladimir-morales/modelos_box_jenkins).
 
 Se puede visualizar el presente informe en formato pdf, en el siguiente enlace:
 
-- https://bladimir-morales.github.io/series_de_tiempo/trabajo1.pdf
+- https://bladimir-morales.github.io/modelos_box_jenkins/trabajo2.pdf
 
 Se puede visualizar el presente informe en formato html, en el siguiente enlace:
 
-- https://bladimir-morales.github.io/series_de_tiempo/trabajo1.html
+- https://bladimir-morales.github.io/modelos_box_jenkins/trabajo2.html
 
 
 # Indice de consumo de agua potable ICAP
@@ -63,6 +63,7 @@ Para fines prácticos se puso la variable en estudio en formato *.txt, el cual p
 # Gráfico
 
 ```{r}
+#url<-"https://raw.githubusercontent.com/bladimir-morales/modelos_box_jenkins/main/agua.txt"
 url<-"https://raw.githubusercontent.com/bladimir-morales/series_de_tiempo/main/data/agua.txt"
 agua<-read.table(url,head=T)
 serie<-ts(agua$agua,start = c(1990,1),frequency = 12)
