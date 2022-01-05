@@ -13,13 +13,12 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-#library(readxl)
+knitr::opts_chunk$set(echo = TRUE,warning = FALSE)
 library(tidyverse)
-#library(dygraphs)
 #library(fpp)
 library(forecast)
 library(tseries)
+library(lmtest)#durbin_watson
 ```
 
 \newpage
@@ -45,17 +44,15 @@ Se puede visualizar el presente informe en formato html, en el siguiente enlace:
 
 # Indice de consumo de agua potable ICAP
 
-## Descripción 
-
-### Datos
+## Datos
 
 El indice mensual de consumo de agua potable de Bolivia ICAP, es un indicador que nos permite conocer *la evolución y comportamiento* del consumo de agua potable de los sectores privado y público a nivel general con año base de 1990, así para este año el indice será igual a 100 y para las siguientes gestiones presentará una variación (incremento o decremento) respecto al año base de acuerdo al consumo de agua potable del mes a tratarse. 
 
-### Periodo de estudio
+## Periodo de estudio
 
 La serie de tiempo esta con periodicidad mensual, comprendidos desde enero de 1990 hasta julio de 2021, teniendo en total 379 observaciones.
 
-### Fuente de datos
+## Fuente de datos
 
 La información del indice mensual de consumo de agua potable de Bolivia se puede encontrar en la página oficial del Instituto Nacional de Estadística (INE)^[www.ine.gob.bo], sección de "Estadísticas Económicas" y subsección "Servicios básicos". Específicamente se puede descargar los datos en formato establecido por la institución en excel del siguiente enlace: (https://nube.ine.gob.bo/index.php/s/M1H9axannIL7leg/download).
 
@@ -63,60 +60,25 @@ Los metadatos están disponibles en el Catálogo del Archivo Nacional de Datos (
 
 Para fines prácticos se puso la variable en estudio en formato *.txt, el cual puede ser descargada del siguiente enlace (https://raw.githubusercontent.com/bladimir-morales/series_de_tiempo/main/data/agua.txt).
 
-## Gráfico
+# Gráfico
 
 ```{r}
 url<-"https://raw.githubusercontent.com/bladimir-morales/series_de_tiempo/main/data/agua.txt"
 agua<-read.table(url,head=T)
-agua_serie<-ts(agua$agua,start = c(1990,1),frequency = 12)
+serie<-ts(agua$agua,start = c(1990,1),frequency = 12)
 
-forecast::autoplot(agua_serie,series = "ICAP")+
+autoplot(serie,series = "ICAP")+
   ggtitle("Indice mensual de consumo de agua potable en Bolivia: enero 1990 a julio 2021 \n 
           (año base 1990=100)")+
   xlab("Año")+ylab("ICAP")+
-  theme(legend.position = "none")+
-  scale_color_manual(values="#2B7DFF")
+  scale_color_manual(values="#2B7DFF")+
+  theme(legend.position = "none")
 ```
 
-En el gráfico visualmente se puede observar que la serie de tiempo en estudio tendría tendencia aditiva y efecto estacional. 
+En el gráfico visualmente se puede observar que la serie de tiempo en estudio tendría tendencia aditiva y un posible efecto estacional. 
 
-### Tendencia
 
-Para obtener la tendencia de la serie de tiempo, se aplicará una media móvil de orden 12 ya que las observaciones son mensuales.
-
-```{r}
-ma_agua_serie<-ma(agua_serie,order = 12)
-
-autoplot(agua_serie,series = "ICAP")+
-  autolayer(ma_agua_serie,series="Tendencia")+
-  ggtitle("Tendencia del Indice mensual de consumo de agua potable en Bolivia")+
-  xlab("Año")+ylab("ICAP")+
-  scale_color_manual(values=c("#A4C4FC","#E80808"))
-```
-
-Con la media móvil de orden 12 se puede observar en el gráfico la tendencia aditiva de la serie de tiempo, cabe mencionar que en diciembre del 2016 a aproximadamente junio del 2017 hay una rampa decreciente que puede explicarse por un fenómeno climático de sequía y falta de lluvias en Bolivia, lo cual derivó a un desabastecimiento de agua en ocho de los nueve departamentos del país y en 94 barrios del departamento de La Paz existió un racionamiento de agua, esto se detalla de mejor manera el reportaje de CNN en español en su portal web^[https://cnnespanol.cnn.com/2016/11/21/declaran-emergencia-nacional-en-bolivia-por-sequia-y-falta-de-agua/].
-
-### Estacionalidad
-
-```{r}
-ggseasonplot(agua_serie,main="Estacionalidad del Indice Mensual de Consumo de Agua Potable",
-           year.labels = T,xlab="Mes",ylab="ICAP")
-```
-
-En este gráfico se puede observar que existe una tendencia creciente, ya que a medida que pasa cada año el consumo de agua potable va aumentando, por otro lado no se presente de manera clara el efecto estacional.
-
-```{r}
-monthplot(agua_serie,ylab="",main="Estacionalidad del Indice Mensual de Consumo de Agua Potable",
-          labels = c("Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"),
-          xlab="Mes")
-```
-
-En este último gráfico se puede observar que podría existir un efecto estacional ya que en los meses de enero y noviembre asciende de manera muy leve el consumo de agua potable en Bolivia, pero en los demás meses se mantiene casi constantemente.
-
-**Conclusión:**  
-Se puede concluir entonces con un análisis visual que la serie en estudio del indice de consumo de agua potable en Bolivia tiene efecto de tendencia aditiva con una posible estacionalidad.
-
-## Datos de entrenamiento y test
+# Datos de entrenamiento y test
 
 Para efectos de obtener un modelo óptimo y lo más preciso posible, se dividirá la serie de tiempo en dos conjuntos:
 
@@ -131,72 +93,656 @@ Se tomará en cuenta los datos desde enero de 2020 hasta julio de 2021, contando
 En el siguiente gráfico se puede observar la serie de entrenamiento y de test.
 
 ```{r}
-agua_serie_ent<-ts(agua$agua,start = c(1990,1),end = c(2019,12), frequency=12)
-agua_serie_test<-ts(agua$agua[361:379],start = c(2020,1), frequency=12)
+serie_ent<-ts(agua$agua,start = c(1990,1),end = c(2019,12), frequency=12)
+serie_test<-ts(agua$agua[361:379],start = c(2020,1), frequency=12)
 
-autoplot(agua_serie_ent,series = "ICAP \nentrenamiento")+
-  autolayer(agua_serie_test,series="ICAP \ntest")+
+autoplot(serie_ent,series = "ICAP entrenamiento")+
+  autolayer(serie_test,series="ICAP test")+
   ggtitle("Conjunto de entrenamiento y test del ICAP")+
   xlab("Año")+ylab("ICAP")+
-  scale_color_manual(values=c("#469F4B","#A462EF"))
+  scale_color_manual(values=c("#469F4B","#A462EF"))+
+  theme(legend.position = "bottom",legend.title = element_blank() )
 ```
 
 
 
 # Ajuste del Modelo de Box y Jenkins
 
-Se aplicará el modelo de Box y Jenkins
+En esta sección se ajustará un modelo de Box y Jenkins a la serie del ICAP de entrenamiento, para el cual lo primero que se verificara es la estacionariedad (media y varianza) y la estacionalidad de la serie. Posteriormente se realizarán las transformaciones necesarias si es el caso para poder ajustar una serie estacionaria a un modelo de Box y Jenkins.
 
 ## Estacionariedad
 
-Para poder determinar de manenra teórica si la serie del ICAP es estacionaria se hará un análisis gráfico de la función de autocorrelación, 
+Para poder determinar si la serie del ICAP de entrenamiento es estacionaria en media y varianza se visualizará primero el gráfico de la serie realizando una descomposición de la misma, segundo la función de autocorrelación y tercero se harán pruebas de hipótesis para rechazar o no la hipótesis nula. 
 
-### Función de autocorrelación 
-
-```{r}
-acf(agua_serie_ent)
-```
-
-### Test de estacionariedad de Box-Pierce
+### Análisis gráfico de la serie de entrenamiento y descomposición
 
 ```{r}
-Box.test(agua_serie_ent,type="Box-Pierce")
+autoplot(serie_ent,series = "ICAP entrenamiento")+
+  ggtitle("ICAP entrenamiento")+
+  xlab("Año")+ylab("ICAP")+
+  scale_color_manual(values=c("#469F4B"))+
+  theme(legend.position = "none")
 ```
 
+Visualmente se puede observar que se tiene una tendencia aditiva y posiblemente estacionalidad multiplicativam, además de presentar varianza no constante en el tiempo.
 
-### Test de estacionariedad de Ljung-Box
+Para tener mejor precisión de lo mencionado se va a descomponer la serie de tiempo.
 
 ```{r}
-Box.test(agua_serie_ent,type="Ljung-Box")
+descomposicion<-decompose(serie_ent) 
+plot(descomposicion)
+```
+
+En la descomposición se puede observar que existe una tendencia aditiva y efecto estacional.
+
+Para visualizar de mejor manera la tendencia que es la aplicación de una media móvil de orden $12$ debido a que las observaciones son mensuales se tiene el siguiente gráfico.
+
+```{r}
+autoplot(serie_ent, series = "ICAP entrenamiento")+
+  autolayer(descomposicion$trend,series = "Tendencia")+
+  ggtitle("Tendencia del ICAP de entrenamiento")+
+  xlab("Año")+ylab("ICAP")+
+  scale_color_manual(values=c("#A4C4FC","#E80808"))+
+  theme(legend.position = "bottom",legend.title = element_blank())
+```
+
+Con la media móvil de orden 12 se puede observar en el gráfico la tendencia aditiva de la serie de tiempo, cabe mencionar que en diciembre del 2016 a aproximadamente junio del 2017 hay una rampa decreciente que puede explicarse por un fenómeno climático de sequía y falta de lluvias en Bolivia, lo cual derivó a un desabastecimiento de agua en ocho de los nueve departamentos del país y en 94 barrios del departamento de La Paz existió un racionamiento de agua, esto se detalla de mejor manera el reportaje de CNN en español en su portal web^[https://cnnespanol.cnn.com/2016/11/21/declaran-emergencia-nacional-en-bolivia-por-sequia-y-falta-de-agua/].
+
+El efecto estacional se estudiara más adelante.
+
+### Función de autocorrelación FAC
+
+Ahora se vera el gráfico de la función de autocorrelación (FAC) de la serie de entrenamiento del ICAP.
+
+```{r}
+acf(serie_ent)
+```
+
+El gráfico de la FAC, no presenta un decaimiento exponencial a $0$, resultando como conclusión la no estacionariedad de la serie.
+
+### Dócimas de estacionariedad 
+
+Para la prueba de estacionariedad se utilizará el test de Dickey Fuller Aumentado donde las hipótesis a contrastar son:
+
+$$H_0: \gamma=0 \;\text{por consiguiente}\; (\phi_1=1)$$
+$$H_0: \gamma\neq 0 \;\text{por consiguiente}\; (\phi_1<1)$$
+o equivalentemente
+
+$$H_0:\text{ Existe raíz unitaria (no es estacionaria)} $$
+$$H_1: \text{ No existe raíz unitaria (es estacionaria)} $$
+Se probará el contraste con el siguiente comando:
+
+```{r warning=TRUE}
+adf.test(serie_ent)
+```
+
+Se puede observar que el $p-valor$ es menor a $0.01$ por el mensaje de alerta que imprime el software, llegando así a la decisión de rechazar la hipótesis nula, lo cual deriva a que la serie seria estacionaria. Lo cual entra en contradicción con el análisis del gráfico, la descomposición y la FAC, hay que tener en cuenta que los rezagos que esta tomando esta prueba por defecto son $7$ y como nuestra serie es mensual realizaremos el test con almenos $12$ rezagos.
+
+```{r warning=TRUE}
+adf.test(serie_ent,k=12)
+```
+
+Ahora se puede observar que el $p-valor$ es igual a $0.4054$ llegando a la decisión de no rechazar la hipóstesis nula, lo cual deriva a que la serie no es estacionaria, no entrando en contradicción con los análisis previos.
+
+*Observación:* 
+
+Para poder determinar desde qué número de rezagos no se rechaza la hipótesis nula se crea la siguiente iteración de la prueba de Dickey Fuller Aumentado:
+
+```{r}
+for(i in 1:24){
+  test<-adf.test(serie_ent,k=i)
+  print(paste0("Nro. de rezagos: ",i,", P-valor:",test$p.value))
+}
+```
+
+Como se puede observar desde el rezago $9$ para adelante no se rechaza la hipótesis nula, pensando así que desde ese número de rezagos la serie presenta no estacionariedad.
+
+### Conclusión de estacionariedad
+
+Posterior a realizar un análisis de la serie del ICAP de Bolivia tanto gráfico, por descomposición, la función de autocorrelación FAC y realizar la prueba de Dickey Fuller Aumentado se concluye que la serie es no estacionaria tanto en media como en varianza, presentando así tendencia positiva y varianza no constante.
+
+## Estacionalidad
+
+### Análisis gráfico
+
+Para determinar de mejor manera el efecto estacional que en primera instancia resulto de la descomposición de la serie de tiempo el cual se refleja en el siguiente gráfico.
+
+```{r}
+autoplot(descomposicion$seasonal)+
+  ggtitle("Estacionalidad de la descomposición ICAP")+
+  xlab("Año")+ylab("Estacionalidad ICAP")
 ```
 
 
 
 ```{r}
-adf.test(agua_serie_ent)
-
-log_agua_serie_ent<-log(agua_serie_ent)
-dif_log_agua_serie_ent<-diff(log_agua_serie_ent,lag=1)
-autoplot(dif_log_agua_serie_ent)
-adf.test(dif_log_agua_serie_ent)
-
-log_agua_serie_ent<-log(agua_serie_ent)
-dif_log_agua_serie_ent<-diff(log_agua_serie_ent,lag=1)
-dif2_log_agua_serie_ent<-diff(dif_log_agua_serie_ent,lag=12)
-autoplot(dif2_log_agua_serie_ent)
-adf.test(dif2_log_agua_serie_ent)
-
-
-dif_agua_serie_ent<-diff(agua_serie_ent,lag=1)
-dif2_agua_serie_ent<-diff(dif_agua_serie_ent,lag=12)
-autoplot(dif2_agua_serie_ent)
-adf.test(dif2_agua_serie_ent)
-
-
-
-
-
-modelo<-arima(agua_serie_ent)
+ggseasonplot(serie_ent,main="Estacionalidad del Indice Mensual de Consumo de Agua Potable",
+           year.labels = T,xlab="Mes",ylab="ICAP")
 ```
+
+En este gráfico se puede observar en primera instancia que existe una tendencia aditiva lo cual verifica lo mostrado anteriormente, ya que a medida que pasa cada año el consumo de agua potable va aumentando, por otro lado no se presente de manera clara el efecto estacional, pero en el mes de noviembre se puede ver un leve incremento de la serie en estudio.
+
+```{r}
+monthplot(serie_ent,ylab="",main="Estacionalidad del Indice Mensual de Consumo de Agua Potable",
+          labels = c("Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"),
+          xlab="Mes")
+```
+
+En este último gráfico se puede observar que podría existir un efecto estacional ya que en los meses de enero y noviembre asciende de manera muy leve el consumo de agua potable en Bolivia, pero en los demás meses se mantiene casi constantemente.
+
+### Conclusión estacionalidad
+
+Se puede concluir entonces con un análisis visual que la serie en estudio del indice de consumo de agua potable en Bolivia tiene efecto de tendencia aditiva con estacionalidad.
+
+
+## Transformación de la serie temporal
+
+Como se pudo concluir en los análisis previos de estacionariedad y estacionalidad la serie del ICAP de entrenamiento es no estacionario en media y tampoco en varianza, además de tener efecto estacional, por esos motivos se procederá a realizar transformaciones para poder tener una serie de tiempo estacionaria en media y varianza y sin efecto estacional.
+
+### Transformación logaritmo
+
+Para poder tener varianza constante se utilizará la transformación logaritmo a la serie del ICAP de entrenamiento.
+
+```{r}
+log_serie_ent<-log(serie_ent)
+
+autoplot(log_serie_ent,series="Logaritmo de ICAP entrenamiento")+
+  ggtitle("Logaritmo del ICAP de entrenamiento")+
+  xlab("Año")+ylab("Log ICAP")+
+  scale_color_manual(values=c("#469F4B"))+
+  theme(legend.position = "none")
+```
+Se puede visualizar que la serie ya no cuenta con varianza creciente conforme pasa el tiempo. 
+
+### Diferenciación
+
+Como la serie aplicada a logaritmo aún presenta tendencia se hará una diferencia con rezago $1$.
+
+```{r}
+dif_log_serie_ent<-diff(log_serie_ent,1)
+
+autoplot(dif_log_serie_ent)+
+  ggtitle("Diferencia_1 del Log-ICAP de entrenamiento")+
+  xlab("Año")+ylab("Dif1 Log ICAP")+
+  scale_color_manual(values=c("#469F4B"))+
+  theme(legend.position = "none")
+```
+
+La serie gráficamente presenta media constante y su varianza también excpeto por el periodo entre el 2016 al 2017 que aumenta su variabilidad. 
+
+
+```{r}
+acf(dif_log_serie_ent)
+```
+
+Teniendo el gráfico de la función de autocorrelación si existe decaimiento exponencial a $0$, lo cual indica la  estacionariedad de la serie de tiempo.
+
+Se hará la prueba de Dickey Fuller Aumentada para verificar estacionariedad.
+
+```{r}
+adf.test(dif_log_serie_ent,k=12)
+```
+
+Se rechaza la hipótesis nula donde se concluye que la serie es estacionaria, tomando solo una diferencia. 
+
+Pero como se analizó anteriormente la serie tenia presumiblemente estacionalidad lo cual se podría quitar con una diferenciación de $12$ rezagos, a la serie aplicada con logaritmo y diferenciada una vez con $1$ rezago.
+
+```{r}
+dif12_dif_log_serie_ent<-diff(dif_log_serie_ent,12)
+
+autoplot(dif12_dif_log_serie_ent)+
+  ggtitle("Diferencia_12 de la Diferencia_1 del Log-ICAP de entrenamiento")+
+  xlab("Año")+ylab("Dif12 Dif1 Log ICAP")+
+  scale_color_manual(values=c("#469F4B"))+
+  theme(legend.position = "none")
+```
+
+La serie no presenta tendencia, teniendo media y varianza constante, y tampoco presenta efecto estacional, donde visualmente estaríamos en frente una serie estacionaria. 
+
+```{r}
+acf(dif12_dif_log_serie_ent)
+```
+
+Teniendo el gráfico de la función de autocorrelación existe decaimiento exponencial a $0$, lo cual indica la estacionariedad de la serie de tiempo.
+
+Para comprobar esto probamos el test de Dickey Fuller Aumentado.
+
+```{r}
+adf.test(dif12_dif_log_serie_ent,k=12)
+```
+
+Se rechaza la hipótesis nula de raíz unitaria teniendo así una serie estacionaria.
+
+### Conclusión de las transformaciones
+
+Se puede concluir que se tiene una serie estacionaria aplicando logaritmo y una diferenciación con rezago igual a $1$ a la serie de tiempo del ICAP de Bolivia. No se ve necesario aplicar la diferenciación con rezago igual a $12$ posterior al logaritmo y a la diferenciación con $1$ rezago.
+
+Para consolidar lo que se menciono se procederá a utilizar el comando en R que nos ayuda a ver cuantas diferencias se necesita y así también en la estacionalidad.
+
+```{r}
+paste0("Se necesita diferenciar: ",ndiffs(log_serie_ent)," vez")
+paste0("Se necesita diferenciar en la parte estacional: ",nsdiffs(log_serie_ent)," veces")
+```
+
+## Ajuste del Modelo
+
+Como se pudo determinar en la transformación de la serie se aplico logaritmo para estabilizar varianza y una diferencia de rezago $1$ para que sea estacionaria. No es necesario diferenciar con rezago $12$. 
+
+Se grafica las FAC y FACP de la serie transformada.
+
+```{r}
+par(mfrow=c(1,2))
+acf(dif_log_serie_ent,lag=40)
+pacf(dif_log_serie_ent,lag=40)
+```
+
+De estas gráficas se puede pensar en estimar los siguientes modelos:
+
+1) $SARIMA(2,1,1)(1,0,1)_{12}$
+
+2) $SARIMA(4,1,1)(0,0,1)_{12}$
+
+### Modelo 1
+
+$SARIMA(2,1,1)(1,0,1)_{12}$
+
+```{r}
+significancia<-function(modelo,se_modelo){
+  prueba_coef<-c()
+  for (i in 1:length(modelo)) {
+    prueba_coef[i]<-modelo[i]/sqrt(se_modelo[i,i])
+    print(paste0(names(modelo[i])," :  ", prueba_coef[i]))
+  }
+}
+```
+
+
+```{r}
+sarima1<-Arima(log_serie_ent,order = c(2,1,1),seasonal = c(1,0,1))
+sarima1
+```
+
+```{r}
+significancia(sarima1$coef,sarima1$var.coef)
+```
+
+Al verificar la significancia de los parámetros estimados que resultan de la división del parámetro estimado entre la desviación estándar del mismo se tiene aproximadamente que todos los mayores a $2$ en valor absoluto son significativos.
+
+Teniendo así que en el ajuste del primer modelo $SARIMA(2,1,1)(1,0,1)_{12}$ el coeficiente autoregresivo de orden $2$ AR(2) es no significativo para el modelo, se estima el mismo quitando ese estimador resultando así un modelo $SARIMA(1,1,1)(1,0,1)_{12}$
+
+```{r}
+sarima1<-Arima(log_serie_ent,order = c(1,1,1),seasonal = c(1,0,1))
+sarima1
+```
+
+```{r}
+significancia(sarima1$coef,sarima1$var.coef)
+```
+
+Como se puede observar ahora el coeficiente AR(1) es no significativo para el modelo, por tanto se estima un modelo 
+$SARIMA(0,1,1)(1,0,1)_{12}$
+
+```{r}
+sarima1<-Arima(log_serie_ent,order = c(0,1,1),seasonal = c(1,0,1))
+sarima1
+```
+
+
+```{r}
+significancia(sarima1$coef,sarima1$var.coef)
+```
+
+Así para el modelo $SARIMA(0,1,1)(1,0,1)_{12}$ todos los parámetros estimados son significativos. Para este modelo estimado se tiene un Criterio de información de Akaike AIC 
+
+```{r}
+AIC_sarima1<-sarima1$aic
+AIC_sarima1
+```
+
+### Modelo 2
+
+$SARIMA(4,1,1)(0,0,1)_{12}$
+
+```{r}
+sarima2<-Arima(log_serie_ent,order = c(4,1,1),seasonal = c(0,0,1))
+sarima2
+```
+
+```{r}
+significancia(sarima2$coef,sarima2$var.coef)
+```
+
+Se tiene que en el ajuste del modelo $SARIMA(4,1,1)(0,0,1)_{12}$ el coeficiente autoregresivo de orden $2,3,4$ AR(2), AR(3) y AR(4) es no significativo para el modelo, se estima el mismo quitando ese estimador resultando así un modelo $SARIMA(1,1,1)(0,0,1)_{12}$
+
+```{r}
+sarima2<-Arima(log_serie_ent,order = c(1,1,1),seasonal = c(0,0,1))
+sarima2
+```
+
+```{r}
+significancia(sarima2$coef,sarima2$var.coef)
+```
+
+Así para el modelo $SARIMA(1,1,1)(0,0,1)_{12}$ todos los parámetros estimados son significativos. 
+
+El Criterio de información de Akaike AIC es:
+
+```{r}
+AIC_sarima2<-sarima2$aic
+AIC_sarima2
+```
+
+### Modelo 3
+
+Para el tercer modelo se estimará un con un comando en R que genera un proceso automático en el ajuste de los modelos Box y Jenkins.
+
+```{r}
+arima_automatico<-auto.arima(log_serie_ent)
+arima_automatico
+```
+
+```{r}
+significancia(arima_automatico$coef,arima_automatico$var.coef)
+```
+
+Los parámetros estimados AR(2) y MA(2) no son significativos. 
+
+```{r}
+AIC_arima_automatico<-arima_automatico$aic
+AIC_arima_automatico
+```
+
+### Decisión
+
+Se pudo encontrar tres posibles modelos dos de los cuales tienen todos sus coeficientes significativos, para tomar la decisión de cual modelo elegir se utilizará el Criterio de Información de Akaike AIC.
+
+$SARIMA(0,1,1)(1,0,1)_{12}$ 
+
+```{r}
+AIC_sarima1
+```
+
+$SARIMA(1,1,1)(0,0,1)_{12}$ 
+ 
+```{r}
+AIC_sarima2
+```
+ 
+$SARIMA(5,1,0)(2,0,0)_{12}$
+
+```{r}
+AIC_arima_automatico
+```
+
+El que tiene mejor AIC es el modelo $SARIMA(0,1,1)(1,0,1)_{12}$ , por tal motivo tomaremos este para realizar la validación de supuestos.
+
+## Validación de supuestos
+
+### Independencia de Residuos
+
+Graficamos los residuos.
+
+```{r}
+residuos<-sarima1$residuals
+autoplot(residuos)+
+  ggtitle("Residuos SARIMA(3,1,1)(1,0,1)_{12}")
+```
+
+
+- **FAC y FACP**
+
+En primera instancia los residuos deben ser semejantes a un ruido blanco, donde los coeficientes estimados de la FAC y FACP no deben ser significativamente distintos de cero.
+
+```{r}
+par(mfrow=c(1,2))
+acf(residuos)
+pacf(residuos)
+```
+
+Coomo se puede visualizar todos los coeficientes estimados de la FAC y FACP de los residuos son aproximadamente cero, teniendo así posiblemente ruido blanco.
+
+- **Dócima de Box-Pierce y Ljung-Box**
+
+Se utilizará en primera instancia la prueba de Box-Pierce y Ljung-Box que tienen como hipótesis:
+
+$$H_0:\rho_1=\rho_2=...=\rho_k=0 \text{  (independencia)}$$
+
+```{r}
+Box.test(residuos,type = "Box-Pierce")
+```
+
+Para la prueba de Box-Pierce no se rechaza $H_0$ teniendo así independencia en los residuos.
+
+
+```{r}
+Box.test(residuos,type = "Ljung-Box")
+```
+
+Para la prueba de Ljung-Box no se rechaza $H_0$ teniendo así independencia en los residuos.
+
+- **Dócima de Durbin-Watson**
+
+Ahora se utilizará la prueba de Durbin-Watson donde se tendrían los siguientes supuestos:
+
+a) El modelo debe incluir un intercepto
+b) Los errores están generados mediante un esquema autoregresivo de orden 1.
+
+La hipótesis serán:
+
+$$H_0: \phi_1=0 \text{ (No hay autocorrelación)}$$
+$$H_1: \phi_1\neq 0 \text{ (Hay autocorrelación)}$$
+
+```{r}
+residuos_fit<-lm(residuos[-c(1,length(residuos))]~1)
+dwtest(residuos_fit,alternative="two.sided")
+```
+
+Como $DW=1.9177$ y el $p-valor>0.05$ por lo tanto no se rechaza la hipótesis nula, no existiendo autocorrelación de orden 1.
+
+**Conclusión: ** Existe evidencia estadística para decir que los residuos son independientes y no autocorrelacionados.
+
+### Normalidad de Residuos
+
+Se verifica en los residuos QQ-normal y el histograma.
+
+```{r}
+par(mfrow=c(1,2))
+qqnorm(residuos)
+hist(residuos)
+```
+
+Se puede observar la existencia de datos atípicos, efectivamente si se ven los residuos a más detalle existe un valor atípico en diciembre del 2016, el cual se mencionó en el estudio de tendencia un decaimiento bastante fuerte a lo usual de la serie temporal. Este valor atípico puede que este produciendo algún tipo de sesgo en el estudio de normalidad. 
+
+```{r}
+atipico<-which.min(residuos)
+par(mfrow=c(1,2))
+qqnorm(residuos[-atipico])
+hist(residuos[-atipico])
+```
+
+Visualmente al quitar este valor atípico se puede observar que posiblemente exista normalidad en los residuos. Para poder determinar el mismo se realizarán las dócimas de normalidad con este valor atípico y sin él.
+
+Se realizará las pruebas de normalidad.
+
+- **Dócima de Jarque-Bera**
+
+La dócima de Jarque-Bera tiene la siguiente hipótesis nula
+
+$$H_0: \text{ Los residuos son normales}$$
+```{r}
+normtest::jb.norm.test(residuos)
+```
+
+Se rechaza la hipótesis nula donde se concluye que los residuos no cumplen normalidad como se pudo observar en el gráfico.
+
+```{r}
+normtest::jb.norm.test(residuos[-atipico])
+```
+
+Sin contar con este dato se puede observar que no se rechaza la hipótesis nula, teniendo así normalidad en los residuos.
+
+- **Dócima de Shapiro-Wilk**
+
+La dócima de Shapiro-Wilk tiene la siguiente hipótesis nula
+
+$$H_0: \text{La distribución es normal}$$
+
+```{r}
+shapiro.test(residuos)
+```
+
+Se rechaza la hipótesis nula donde se concluye que los residuos no cumplen normalidad.
+
+```{r}
+shapiro.test(residuos[-atipico])
+```
+
+No se rechaza la hipótesis nula donde se concluye que los residuos cumplen normalidad.
+
+**Conclusión: **Se puede evidenciar que no existe normalidad en los residuos teniendo en cuenta el valor atípico sucitado en diciembre del 2016. No tomando en cuenta este valor se puede decir que los residuos son normales
+
+
+### Homocedasticidad de Residuos
+
+Se hará primero un análisis gráfico.
+
+```{r}
+plot(sarima1$fitted,residuos)
+```
+
+Se puede evidenciar que existe un valor atípico el cual corresponde a diciembre del 2016, pero según el gráfico existiria homocedasticidad, sin contar con ese valor atípico.
+
+**Dócima de White**
+
+La hipótesis a contrastar es:
+
+$$H_0: \text{ Residuos son homocedasticos}$$
+```{r}
+white.test(residuos)
+```
+
+Se concluye que no se rechaza la hipótesis nula, teniendo así evidencia estadística para decir que los residuos son homocedásticos.
+
+**Dócima de Breush-Pagan**
+
+La hipótesis a contrastar es:
+
+$$H_0: \text{ Residuos son homocedasticos}$$
+```{r}
+residuos_fit<-lm(residuos[-1] ~ residuos[-length(residuos)])
+bptest(residuos_fit)
+```
+
+No se rechaza la hipótesis nula.
+
+**Conclusión: ** Existe evidencia estadística para decir que los residuos son homocedasticos, no presentando así heterocedasticidad.
+
+## Conclusión ajuste del modelo
+
+Se puede concluir entonces que el modelo elegido $SARIMA(0,1,1)(1,0,1)_{12}$ tiene el menor AIC teniendo residuos independientes y homocedásticos, en cuanto a la normalidad sin contar con el valor atípico del 2016 se puede asumir este supuesto. 
+
+# Gráfico serie original y el ajustado
+
+Primero gráficamos la serie del ICAP aplicado a logaritmo y el ajuste del modelo $SARIMA(0,1,1)(1,0,1)_{12}$ 
+
+```{r}
+autoplot(log_serie_ent,series="log ICAP entrenamiento")+
+  autolayer(sarima1$fitted,series = "SARIMA(0,1,1)(1,0,1)")+
+  ggtitle("Log ICAP y Modelo Ajustado")+
+  xlab("Año")+ylab("log ICAP")+
+  scale_color_manual(values=c("#A4C4FC","#E80808"))+
+  theme(legend.position = "bottom",legend.title = element_blank() )
+```
+
+Ahora gráficamos la serie original del ICAP y el inverso del logaritmo (exponencial) al modelo ajustado.
+
+```{r}
+autoplot(serie_ent,series="ICAP entrenamiento")+
+  autolayer(exp(sarima1$fitted),series = "exp[SARIMA(0,1,1)(1,0,1)]")+
+  ggtitle("ICAP y Exponencial del Modelo Ajustado")+
+  xlab("Año")+ylab("log ICAP")+
+  scale_color_manual(values=c("#A4C4FC","#E80808"))+
+  theme(legend.position = "bottom",legend.title = element_blank() )
+```
+
+# Predicción 
+
+Se realizará la predicción para el conjunto test del ICAP.
+
+```{r}
+prediccion<-forecast(sarima1,19)
+prediccion
+```
+
+Primero gráficamos la serie del ICAP tanto de entrenamiento como de test aplicado a logaritmo y el ajuste del modelo $SARIMA(0,1,1)(1,0,1)_{12}$ más su predicción. 
+
+```{r}
+autoplot(log_serie_ent,series="log ICAP")+
+  autolayer(sarima1$fitted,series = "SARIMA(0,1,1)(1,0,1)")+
+  autolayer(prediccion,series = "Predicción")+
+  autolayer(log(serie_test),series = "log ICAP test")+
+  ggtitle("Log ICAP y Modelo Ajustado más predicción")+
+  xlab("Año")+ylab("log ICAP")+
+  scale_color_manual(values=c("#A4C4FC","#0D139B","#189B0D","#E80808"))+
+  theme(legend.position = "bottom",legend.title = element_blank() )
+```
+
+Ahora gráficamos la serie original del ICAP tanto de entrenamiento como de test y el inverso del logaritmo (exponencial) al modelo ajustado más su predicción.
+
+```{r}
+autoplot(serie_ent,series="ICAP entrenamiento")+
+  autolayer(exp(sarima1$fitted),series = "exp[SARIMA(0,1,1)(1,0,1)]")+
+  autolayer(exp(prediccion$mean),series = "exp[Predicción]")+
+  autolayer(serie_test,series = "ICAP test")+
+  ggtitle("ICAP y Exponencial del Modelo Ajustado más predicción")+
+  xlab("Año")+ylab("log ICAP")+
+  scale_color_manual(values=c("#189B0D","#E80808","#A4C4FC","#0D139B"))+
+  theme(legend.position = "bottom",legend.title = element_blank() )
+```
+
+# MAPE
+
+Se calcula el MAPE para la predicción de los datos del conjunto del test.
+
+```{r}
+mape<-function(y,f){
+  pe<-((y-f)/y)
+  mape1<-(sum(abs(pe))/length(y))*100
+  return(mape1)
+}
+mape(log(serie_test),prediccion$mean)
+```
+
+
+```{r}
+mape_test<-mape(serie_test,exp(prediccion$mean))
+mape_test
+```
+
+El MAPE es igual a `r mape_test`, esto aplicado a la exponencial de las predicciones.
+
+# Comparación de la predicción
+
+El MAPE obtenido por el método de suavizamiento exponencial específicamente al modelo Holt-Winters aplicado a la serie de entrenamiento fue de $4.5956761$ y el MAPE obtenido por el modelo $SARIMA(0,1,1)(1,0,1)_{12}$ de Box y Jenkins es `r mape_test` teniendo una diferencia de $0.084$ a favor del modelo Holt-Winters.
+
+Se podría concluir que la diferencia es mínima en cuanto al MAPE se refiere, por tal motivo se puede decir que ambos modelos son óptimos para poder predecir de manera eficiente y consistente la serie del ICAP de Bolivia.
+
+# Conclusiones
+
+Se estudio la serie temporal del indice de consumo de agua potable en Bolivia desde el periodo
+de enero de 1990 hasta julio del 2021, teniendo en total 379 observaciones con periodicidad mensual, existiendo un valor atípico en diciembre del 2016. Posteriormente se pudo determinar la existencia de tendencia aditiva con estacionalidad, lo cual derivó a tener no estacionariedad en media y varianza, probando así la Función de Autocorrelación FAC y las dócimas de Dickey Fuller Aumentado.
+
+Se transformó la serie con logaritmo para estabilizar varianza y posteriormente se hizo una diferencia de rezago $1$ que era el único necesario teniendo una serie estacionaria, ya que con rezago $12$ también se cumplia estacionariedad pero solo bastaba con la primera diferencia. 
+
+Se ajustó con la metodología de Box y Jenkins a un modelo $SARIMA(0,1,1)(1,0,1)_{12}$  que presentaba estimadores de parámetros significativos y el menor AIC de todos los modelos propuestos, se realizó la validación de supuestos teniendo así independencia y homocedasticidad en los residuos. En cuanto a la normalidad es necesario comentar que no cumple este supuesto al tener el dato atípico de diciembre de 2016, obviando este dato el supuesto de normalidad en los residuos se cumple.
+
+Al pronosticar los datos con el modelo $SARIMA(0,1,1)(1,0,1)_{12}$ y obtener el MAPE del mismo, se comparó con el MAPE del modelo Holt Winters realizado en el anterior trabajo y se obtuvo una diferencia de $0.084$, mostrando así una mínima diferencia entre ambos,  lo cual deriva a decir que tanto el modelo de Box y Jenkins y el de suavizamiento exponencial son eficientes para realizar pronósticos a la serie del ICAP de Bolivia.
+
+
+
+
+
+
+
 
 
