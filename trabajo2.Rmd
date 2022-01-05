@@ -4,7 +4,7 @@ subtitle: "Trabajo 2. Análisis de Series de Tiempo"
 author: "Bladimir Valerio Morales Torrez"
 date: "Enero 2022"
 output: 
-  html_document:
+  pdf_document:
       toc: yes
       toc_float: yes
       number_section: yes
@@ -63,8 +63,7 @@ Para fines prácticos se puso la variable en estudio en formato *.txt, el cual p
 # Gráfico
 
 ```{r}
-#url<-"https://raw.githubusercontent.com/bladimir-morales/modelos_box_jenkins/main/agua.txt"
-url<-"https://raw.githubusercontent.com/bladimir-morales/series_de_tiempo/main/data/agua.txt"
+url<-"https://raw.githubusercontent.com/bladimir-morales/modelos_box_jenkins/main/agua.txt?token=AOEHMZISFJOYBMKYVNZE2RLB2VRR4"
 agua<-read.table(url,head=T)
 serie<-ts(agua$agua,start = c(1990,1),frequency = 12)
 
